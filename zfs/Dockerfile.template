@@ -1,0 +1,86 @@
+FROM ubuntu:jammy-20220531 as kernel-build
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+RUN apt-get update && \
+    apt-get install -y \
+    bison \
+    build-essential \
+    flex \
+    libelf-dev \
+    libssl-dev \
+    git \
+    bc \
+    automake \
+    autoconf \
+    libtool \
+    libuuid1 \
+    gawk \
+    alien \
+    fakeroot \
+    dkms \
+    libblkid-dev \
+    uuid-dev \
+    libudev-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libaio-dev \
+    libattr1-dev \
+    libelf-dev \
+    python3 \
+    python3-dev \
+    python3-setuptools \ 
+    python3-cffi \
+    libffi-dev \
+    python3-packaging \
+    libcurl4-openssl-dev \
+    debhelper-compat \
+    dh-python \
+    po-debconf \
+    python3-all-dev \
+    python3-sphinx \
+    kmod \
+    wget
+
+
+WORKDIR /usr/src/app
+
+ARG SRC_DIR=src
+ARG OUT_DIR=out
+ARG OS_VERSION
+
+COPY include include/
+COPY build.sh .
+COPY load.sh .
+COPY workarounds.sh .
+RUN ./build.sh -s %%BALENA_MACHINE_NAME%% -v $OS_VERSION -i $SRC_DIR -o $OUT_DIR
+
+FROM balenalib/%%BALENA_MACHINE_NAME%%-ubuntu
+
+ENV UDEV=on
+
+ARG SRC_DIR=src
+ARG OUT_DIR=out
+ARG OS_VERSION
+
+RUN apt-get update && \
+    apt-get install -y \
+    kmod \
+    zfsutils-linux \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set the location for kernel modules
+ARG MOD_PATH=/opt/lib/modules/$OS_VERSION/
+# Required for access when the container starts
+ENV MOD_PATH="$MOD_PATH"
+
+# Copy the built kernel module into your app
+COPY --from=kernel-build /usr/src/app/"$OUT_DIR"/"$SRC_DIR"_%%BALENA_MACHINE_NAME%%_"$OS_VERSION"/module/*.ko "$MOD_PATH"
+
+# Copy the startup script for loading the modules
+COPY load.sh /usr/src/app/load.sh
+COPY zfs-utils.sh /usr/src/app/zfs-utils.sh
+
+# Start the script that loads the modules.
+CMD ["sh", "/usr/src/app/load.sh"]

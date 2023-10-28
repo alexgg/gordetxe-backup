@@ -1,0 +1,28 @@
+version: '2'
+services:
+  load:
+    build:
+      context: ./zfs
+      dockerfile: Dockerfile.template
+      args:
+        # Modify to the desired balenaOS version
+        OS_VERSION: 4.1.1+rev1
+    privileged: true
+    restart: on-failure
+    labels:
+      io.balena.features.kernel-modules: '1'
+      io.balena.features.procfs: '1'
+  rsync:
+    build:
+      context: ./rsync
+      dockerfile: Dockerfile
+    privileged: true
+    labels:
+      io.balena.features.procfs: '1'
+    environment:
+      - 'USERNAME=change'
+      - 'PASSWORD=me'
+    ports:
+      - "8073:873"
+    depends_on:
+      - load
