@@ -45,8 +45,11 @@ zfs_import() {
     _pool_name="${2:-${pool_name}}"
     [ -z "${pool_name}" ] && echo "ERROR: No pool name provided" && exit 1
     if ! zpool import "${_pool_name}"; then
-        echo "ERROR: Failed to import ${_pool_name}"
-        exit 1
+        echo "WARNING: Failed to import ${_pool_name} - trying to force import"
+        if ! zpool import -f "${_pool_name}"; then
+            echo "ERROR: Failed to import ${_pool_name}"
+            exit 1
+        fi
     fi
 }
 
